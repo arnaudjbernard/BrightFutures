@@ -45,8 +45,14 @@ public func future<T>(context c: ExecutionContext = Queue.global, task: @auto_cl
     }
 }
 
+/**
+ * The domain of the NSError that indicates that an operation failed with no result.
+ */
 public let NoSuchElementError = "NoSuchElementError"
 
+/**
+* A `Future` represents the result of an asynchronous operation.
+*/
 public class Future<T> {
     
     typealias CallbackInternal = (future: Future<T>) -> ()
@@ -62,6 +68,30 @@ public class Future<T> {
     
     let defaultCallbackExecutionContext = Queue()
     
+    /**
+     * Returns whether the Future succeeded with a result. If present, the
+     * given closure will be called with the result. This is a convenient alternative
+     * for a switch statement on the `TaskResult`.
+     *
+     * The difference with `onComplete` is that this method evaluates and acts on the current state
+     * of the Future and does not register a callback.
+     * 
+     * Since the `fn` closure is optional, this method can be used in two ways. The first way is
+     * as a check if the Future succeeded:
+     *
+     * ```
+     * if future.succeeded() {
+     *
+     * }
+     * ```
+     * The second way is to quickly and safely access the result:
+     * 
+     * ```
+     * future.succeeded { val in
+     *    // called immediately if the future has succeeded
+     * }
+     * ```
+     */
     public func succeeded(fn: (T -> ())? = nil) -> Bool {
         if let res = self.result {
             return res.succeeded(fn)
@@ -69,6 +99,30 @@ public class Future<T> {
         return false
     }
     
+    /**
+     * Returns whether the Future failed. If present, the
+     * given closure will be called with the result. This is a convenient alternative
+     * for a switch statement on the `TaskResult`.
+     *
+     * The difference with `onFailure` is that this method evaluates and acts on the current state
+     * of the Future and does not register a callback.
+     *
+     * Since the `fn` closure is optional, this method can be used in two ways. The first way is
+     * as a check if the Future failed:
+     *
+     * ```
+     * if future.failed() {
+     *
+     * }
+     * ```
+     * The second way is to quickly and safely access the error:
+     *
+     * ```
+     * future.failed { err in
+     *    // called immediately if the future has failed
+     * }
+     * ```
+     */
     public func failed(fn: (NSError -> ())? = nil) -> Bool {
         if let res = self.result {
             return res.failed(fn)
@@ -76,7 +130,33 @@ public class Future<T> {
         return false
     }
     
-    public func completed(success: (T->())? = nil, failure: (NSError->())? = nil) -> Bool{
+    /**
+     * Returns whether the Future completed. If present, the
+     * given closures will be called with the value or error. This is a convenient alternative
+     * for a switch statement on the `TaskResult`.
+     *
+     * The difference with `onComplete` is that this method evaluates and acts on the current state
+     * of the Future and does not register a callback.
+     *
+     * Since both parameters are optional, this method can be used in two ways. The first way is
+     * as a check if the Future completed:
+     *
+     * ```
+     * if future.completed() {
+     *
+     * }
+     * ```
+     * The second way is to quickly and safely access the value or the error:
+     *
+     * ```
+     * future.completed(success: { val in
+     *   // called immediately if the future has succeeded
+     * }, failure: { err in
+     *   // called immediately if the future has failed
+     * }
+     * ```
+     */
+    public func completed(success: (T->())? = nil, failure: (NSError->())? = nil) -> Bool {
         if let res = self.result {
             res.handle(success: success, failure: failure)
             return true
@@ -84,6 +164,9 @@ public class Future<T> {
         return false
     }
     
+    /**
+     * Returns a succeeded Future with the given value
+     */
     public class func succeeded(value: T) -> Future<T> {
         let res = Future<T>();
         res.result = TaskResult(value)
@@ -91,6 +174,9 @@ public class Future<T> {
         return res
     }
     
+    /**
+     * Returns a failed Future with the given error
+     */
     public class func failed(error: NSError) -> Future<T> {
         let res = Future<T>();
         res.result = TaskResult(error)
@@ -115,11 +201,19 @@ public class Future<T> {
         return Future<T>()
     }
     
+    /**
+     * Called by the Promise to complete the Future. If the Future is already completed,
+     * this method throws an exception (TODO).
+     */
     func complete(result: TaskResult<T>) {
         let succeeded = tryComplete(result)
         assert(succeeded)
     }
     
+    /**
+     * Tries to complete the Future, returns whether this succeeded.
+     * Completing will succeed if the Future is not yet complete.
+     */
     func tryComplete(result: TaskResult<T>) -> Bool {
         switch result {
         case .Success(let val):
@@ -129,11 +223,19 @@ public class Future<T> {
         }
     }
     
+    /**
+     * Called by the Promise to complete the Future with success. If the Future is already completed,
+     * this method throws an exception (TODO).
+     */
     func success(value: T) {
         let succeeded = self.trySuccess(value)
         assert(succeeded)
     }
     
+    /**
+     * Tries to complete the Future with success, returns whether this succeeded.
+     * Completing will succeed if the Future is not yet complete.
+     */
     func trySuccess(value: T) -> Bool {
         return q.sync {
             if self.result {
@@ -146,11 +248,19 @@ public class Future<T> {
         };
     }
     
+    /**
+     * Called by the Promise to complete the Future with an error. If the Future is already completed,
+     * this method throws an exception (TODO).
+     */
     func error(error: NSError) {
         let succeeded = self.tryError(error)
         assert(succeeded)
     }
     
+    /**
+     * Tries to complete the Future with success, returns whether this succeeded.
+     * Completing will succeed if the Future is not yet complete.
+     */
     func tryError(error: NSError) -> Bool {
         return q.sync {
             if self.result {
@@ -163,10 +273,21 @@ public class Future<T> {
         };
     }
 
+    /**
+     * Returns the result of this future by blocking until the future completed.
+     * Using the asynchronous methods is preferred.
+     */
     public func forced() -> TaskResult<T> {
         return forced(Double.infinity)!
     }
 
+    /**
+     * Returns the result of this future by blocking until the future completed or
+     * nil if the given time runs out.
+     * Using the asynchronous methods is preferred.
+     *
+     * @param time The number of nanoseconds to wait
+     */
     public func forced(time: NSTimeInterval) -> TaskResult<T>? {
         if let certainResult = self.result {
             return certainResult
