@@ -60,7 +60,7 @@ public class Future<T> {
     
     var callbacks: [CallbackInternal] = Array<CallbackInternal>()
     
-    let defaultCallbackExecutionContext = Queue()
+    let defaultCallbackExecutionContext = Queue.main
     
     public func succeeded(fn: (T -> ())? = nil) -> Bool {
         if let res = self.result {
